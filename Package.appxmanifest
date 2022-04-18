@@ -10,7 +10,7 @@
   <Identity
     Name="zhiqiong"
     Publisher="CN=晓羽"
-    Version="1.0.3.0" />
+    Version="1.0.5.0" />
 
   <mp:PhoneIdentity PhoneProductId="57308517-2e88-4db2-97f1-1ec8bd734a3b" PhonePublisherId="00000000-0000-0000-0000-000000000000"/>
 

@@ -32,7 +32,7 @@ namespace zhiqiong
         {
             this.InitializeComponent();
             this.Suspending += OnSuspending;
-            // Environment.SetEnvironmentVariable("WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS", "--disable-web-security");
+            Environment.SetEnvironmentVariable("WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS", "--disable-web-security");
         }
 
         protected override void OnActivated(IActivatedEventArgs args)
@@ -83,7 +83,7 @@ namespace zhiqiong
                         widgetArgs,
                         Window.Current.CoreWindow,
                         rootFrame);
-                    rootFrame.Navigate(typeof(MainPage),"GAMEBAR");
+                    rootFrame.Navigate(typeof(MainPage), gamebarWindow);
 
                     Window.Current.Closed += gamebarWindowWindow_Closed;
 

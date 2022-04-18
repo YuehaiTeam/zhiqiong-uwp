@@ -1,5 +1,6 @@
-﻿Name "志琼·原神地图"
-OutFile "..\Dist\zhiqiong_installer_1.0.2.exe"
+﻿!define UWPVER 1.0.5
+Name "志琼·原神地图"
+OutFile "..\Dist\zhiqiong-${UWPVER}.exe"
 Unicode True
 InstallDir "$TEMP"
 RequestExecutionLevel admin
@@ -54,7 +55,7 @@ Section "Dummy Section" SecDummy
         nsExec::ExecToLog "powershell.exe -Command certutil -addstore 'Root' '$INSTDIR\@yuehaiteam_zhiqiong.cer'"
         Delete "$INSTDIR\@yuehaiteam_zhiqiong.cer"
         DetailPrint "> 安装程序组件..."
-        File /oname=@yuehaiteam_zhiqiong.msix "..\AppPackages\zhiqiong_1.0.3.0_x64_Test\zhiqiong_1.0.3.0_x64.msix"
+        File /oname=@yuehaiteam_zhiqiong.msix "..\AppPackages\zhiqiong_${UWPVER}.0_x64_Test\zhiqiong_${UWPVER}.0_x64.msix"
         nsExec::ExecToLog "powershell.exe -Command Add-AppxPackage -Path '$INSTDIR\@yuehaiteam_zhiqiong.msix' -DeferRegistrationWhenPackagesAreInUse"
         Delete "$INSTDIR\@yuehaiteam_zhiqiong.msix"
         DetailPrint "> 放行本地连接..."
