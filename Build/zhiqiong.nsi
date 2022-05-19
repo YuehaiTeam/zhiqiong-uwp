@@ -1,4 +1,4 @@
-﻿!define UWPVER 1.0.5
+﻿!define UWPVER 1.0.6
 Name "志琼·原神地图"
 OutFile "..\Dist\zhiqiong-${UWPVER}.exe"
 Unicode True
@@ -8,7 +8,6 @@ ManifestDPIAware true
 ShowInstDetails show
 BrandingText " "
 SetCompressor zlib
-AutoCloseWindow true
 Icon "map.ico"
 InstallColors 0 4008636142
 LoadLanguageFile "${NSISDIR}\Contrib\Language files\SimpChinese.nlf"
@@ -57,6 +56,12 @@ Section "Dummy Section" SecDummy
         DetailPrint "> 安装程序组件..."
         File /oname=@yuehaiteam_zhiqiong.msix "..\AppPackages\zhiqiong_${UWPVER}.0_x64_Test\zhiqiong_${UWPVER}.0_x64.msix"
         nsExec::ExecToLog "powershell.exe -Command Add-AppxPackage -Path '$INSTDIR\@yuehaiteam_zhiqiong.msix' -DeferRegistrationWhenPackagesAreInUse"
+        Pop $0
+        ${If} $0 != 0 
+            MessageBox MB_OK|MB_ICONSTOP "安装程序组件出错，请检查错误信息。"
+            DetailPrint "> 安装程序组件出错，请检查错误信息。"
+            Abort
+        ${EndIf}
         Delete "$INSTDIR\@yuehaiteam_zhiqiong.msix"
         DetailPrint "> 放行本地连接..."
         nsExec::ExecToLog "CheckNetIsolation LoopbackExempt -a -n=zhiqiong_tbtgzvrf5srwm"
@@ -64,8 +69,7 @@ Section "Dummy Section" SecDummy
         nsExec::ExecToLog "powershell.exe -Command start ms-gamebar:activate/zhiqiong_tbtgzvrf5srwm_App_zhiqiong"
         DetailPrint "> 即将完成..."
         MessageBox MB_OK|MB_ICONINFORMATION "安装完成！请按Win+G打开Xbox Game Bar使用悬浮地图。"
-        Goto END
+        Quit
     CANCEL:
         Quit
-    END:
 SectionEnd
