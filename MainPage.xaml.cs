@@ -16,8 +16,12 @@ namespace zhiqiong
     public sealed partial class MainPage : Page
     {
         public bool isInGameBar = false;
+        public bool hasInputBox = false;
         public int origWidth = 0;
         public int origHeight = 0;
+        public bool isOversea = false;
+        public string mapCN = "https://webstatic.mihoyo.com/app/ys-map-cn/index.html#/map/2";
+        public string mapOS = "https://act.hoyolab.com/ys/app/interactive-map/index.html#/map/2";
         public XboxGameBarWidget gamebarWindow = null;
         public MainPage()
         {
@@ -28,7 +32,7 @@ namespace zhiqiong
         protected override void OnNavigatedTo(NavigationEventArgs e)
         {
             var param = e.Parameter;
-            if (param != null)
+            if (param != null && typeof(XboxGameBarWidget) == param.GetType())
             {
                 isInGameBar = true;
                 gamebarWindow = param as XboxGameBarWidget;
@@ -66,7 +70,7 @@ namespace zhiqiong
         public async void WvInit()
         {
             await webView.EnsureCoreWebView2Async();
-            webView.CoreWebView2.Navigate("https://webstatic.mihoyo.com/app/ys-map-cn/index.html#/map/2");
+            webView.CoreWebView2.Navigate(isOversea ? mapOS : mapCN);
             await webView.CoreWebView2.AddScriptToExecuteOnDocumentCreatedAsync(@"
                 window.alert = (msg)=>{window.chrome.webview.postMessage({action:'ALERT',msg:msg.toString()})};
                 !function(){const s = document.createElement('script')
@@ -99,7 +103,7 @@ namespace zhiqiong
             var jObject = Windows.Data.Json.JsonObject.Parse(j);
             // get action
             string action = jObject.GetNamedString("action");
-            if (action == "INPUT" && isInGameBar)
+            if (action == "INPUT" && isInGameBar && !hasInputBox)
             {
                 InputBox();
             }
@@ -112,13 +116,11 @@ namespace zhiqiong
                 await webView.CoreWebView2.ExecuteScriptAsync(@"
                     console.log('Zhiqiong-UWP: Load');
                     webControlMAP.ev.on('hotkey',(e)=>{if(e==='AltZ')window.chrome.webview.postMessage({action:'MAXIMIZE'})})
-                    fetch('https://77.cocogoat.work/upgrade/zhiqiong-uwp.txt').then(e=>e.text()).then(e=>{
-                        const t = e.split(',')
-                        if(t.length<5)return;
-                        const targetVer = t[4];
+                    fetch('https://77.cocogoat.work/upgrade/zhiqiong-uwp.json').then(e=>e.json()).then(e=>{
+                        const targetVer = e.version;
                         const curVer = (navigator.userAgent.match(/zhiqiong-uwp\/([0-9.]*)/)||[])[1]||'0.0.0.0'
-                        if(webControlMAP.versionCompare(targetVer,curVer)>0){
-                            window.chrome.webview.postMessage({action:'COPYALERT',url:'https://zhiqiong.vercel.app',msg:'发现新版本 v'+targetVer+'（当前版本 v'+curVer+'），请复制下方地址手动下载更新'})
+                        if($map.control.versionCompare.versionCompare(targetVer,curVer)>0){
+                            window.chrome.webview.postMessage({action:'COPYALERT',url:'https://zhiqiong.cocogoat.work',msg:'发现新版本 v'+targetVer+'（当前版本 v'+curVer+'），请按Win+G打开Xbox Game Bar后复制下方地址手动下载更新'})
                         }
                     })
                 ");
@@ -177,7 +179,7 @@ namespace zhiqiong
                 TextBox inputTextBox = new TextBox();
                 dialog.Content = inputTextBox;
                 inputTextBox.Text = e.Uri;
-                dialog.Title = "暂不支持在悬浮窗中打开外部链接，请复制到浏览器打开";
+                dialog.Title = "暂不支持在悬浮窗中打开外部链接，请按Win+G打开Xbox Game Bar后复制到浏览器打开";
                 dialog.PrimaryButtonText = "复制并关闭";
                 dialog.SecondaryButtonText = "取消";
                 if (await dialog.ShowAsync() == ContentDialogResult.Primary)
@@ -226,18 +228,18 @@ namespace zhiqiong
                 args.Handled = true;
             }
             // add
-            if (hasSelectAll && isInGameBar)
+            CoreWebView2ContextMenuItem subItem = webView.CoreWebView2.Environment.CreateContextMenuItem("切换到" + (isOversea ? "米游社" : "HoyoLab"), null, CoreWebView2ContextMenuItemKind.Command);
+            subItem.CustomItemSelected += delegate (CoreWebView2ContextMenuItem send, Object ex)
             {
-                CoreWebView2ContextMenuItem subItem = webView.CoreWebView2.Environment.CreateContextMenuItem("无法输入请点我", null, CoreWebView2ContextMenuItemKind.Command);
-                subItem.CustomItemSelected += delegate (CoreWebView2ContextMenuItem send, Object ex)
-                {
-                    this.InputBox();
-                };
-                menuList.Insert(0, subItem);
-            }
+                isOversea = !isOversea;
+                webView.CoreWebView2.Navigate(isOversea ? mapOS : mapCN);
+            };
+            menuList.Insert(0, subItem);
+
         }
         public async void InputBox()
         {
+            hasInputBox = true;
             // Get value of current input
             var jCurrentValue = await webView.CoreWebView2.ExecuteScriptAsync(@"(document.activeElement.tagName==='INPUT'||document.activeElement.tagName==='TEXTAREA')?document.activeElement.value:''");
             var currentValue = Windows.Data.Json.JsonValue.Parse(jCurrentValue).GetString();
@@ -290,6 +292,7 @@ namespace zhiqiong
                             document.activeElement.blur();
                         }");
             }
+            hasInputBox = false;
         }
     }
 
