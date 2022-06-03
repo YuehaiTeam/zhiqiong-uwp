@@ -116,10 +116,10 @@ namespace zhiqiong
                 await webView.CoreWebView2.ExecuteScriptAsync(@"
                     console.log('Zhiqiong-UWP: Load');
                     webControlMAP.ev.on('hotkey',(e)=>{if(e==='AltZ')window.chrome.webview.postMessage({action:'MAXIMIZE'})})
-                    fetch('https://77.cocogoat.work/upgrade/zhiqiong-uwp.json').then(e=>e.json()).then(e=>{
+                    fetch('https://77.cocogoat.work/upgrade/zhiqiong-uwp.json?t='+Math.round(Date.now()/1000/3600)).then(e=>e.json()).then(e=>{
                         const targetVer = e.version;
                         const curVer = (navigator.userAgent.match(/zhiqiong-uwp\/([0-9.]*)/)||[])[1]||'0.0.0.0'
-                        if($map.control.versionCompare.versionCompare(targetVer,curVer)>0){
+                        if($map.control.versionCompare(targetVer,curVer)>0){
                             window.chrome.webview.postMessage({action:'COPYALERT',url:'https://zhiqiong.cocogoat.work',msg:'发现新版本 v'+targetVer+'（当前版本 v'+curVer+'），请按Win+G打开Xbox Game Bar后复制下方地址手动下载更新'})
                         }
                     })
