@@ -1,6 +1,8 @@
 ﻿using System;
 using System.Linq;
+using Windows.Storage;
 using Windows.Foundation;
+using Windows.ApplicationModel;
 using Windows.UI.Xaml.Controls;
 using System.Collections.Generic;
 using Microsoft.Web.WebView2.Core;
@@ -37,6 +39,11 @@ namespace zhiqiong
                 isInGameBar = true;
                 gamebarWindow = param as XboxGameBarWidget;
             }
+        }
+        public IAsyncAction OpenInFullTrust(string url)
+        {
+            ApplicationData.Current.LocalSettings.Values["parameters"] = url;
+            return FullTrustProcessLauncher.LaunchFullTrustProcessForCurrentAppAsync();
         }
         /// <summary>
         /// Toggle maximize mode
@@ -103,6 +110,21 @@ namespace zhiqiong
             var jObject = Windows.Data.Json.JsonObject.Parse(j);
             // get action
             string action = jObject.GetNamedString("action");
+            if (action == "PLUGIN")
+            {
+                string pluginToken = jObject.GetNamedString("token");
+                string pluginQuery = pluginToken == "" ? "" : ("?local-auth=" + pluginToken);
+                string pluginLaunch = "cocogoat-control://launch" + pluginQuery;
+                if (this.isInGameBar)
+                {
+                    await OpenInFullTrust(pluginLaunch);
+                }
+                else
+                {
+                    var uri = new Uri(pluginLaunch);
+                    await Windows.System.Launcher.LaunchUriAsync(uri);
+                }
+            }
             if (action == "INPUT" && isInGameBar && !hasInputBox)
             {
                 InputBox();
@@ -174,21 +196,7 @@ namespace zhiqiong
             e.Handled = true;
             if (this.isInGameBar)
             {
-                // Opening window is not allowed in gamebar, so open prompt box
-                ContentDialog dialog = new ContentDialog();
-                TextBox inputTextBox = new TextBox();
-                dialog.Content = inputTextBox;
-                inputTextBox.Text = e.Uri;
-                dialog.Title = "暂不支持在悬浮窗中打开外部链接，请按Win+G打开Xbox Game Bar后复制到浏览器打开";
-                dialog.PrimaryButtonText = "复制并关闭";
-                dialog.SecondaryButtonText = "取消";
-                if (await dialog.ShowAsync() == ContentDialogResult.Primary)
-                {
-                    // copy to clipboard
-                    Windows.ApplicationModel.DataTransfer.DataPackage dataPackage = new Windows.ApplicationModel.DataTransfer.DataPackage();
-                    dataPackage.SetText(inputTextBox.Text);
-                    Windows.ApplicationModel.DataTransfer.Clipboard.SetContent(dataPackage);
-                }
+                await OpenInFullTrust(e.Uri);
             }
             else
             {

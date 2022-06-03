@@ -5,12 +5,14 @@
   xmlns:mp="http://schemas.microsoft.com/appx/2014/phone/manifest"
   xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
   xmlns:uap3="http://schemas.microsoft.com/appx/manifest/uap/windows10/3"
+  xmlns:desktop="http://schemas.microsoft.com/appx/manifest/desktop/windows10"
+  xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
   IgnorableNamespaces="uap uap3 mp">
 
   <Identity
     Name="zhiqiong"
     Publisher="CN=晓羽"
-    Version="1.0.6.0" />
+    Version="1.0.8.0" />
 
   <mp:PhoneIdentity PhoneProductId="57308517-2e88-4db2-97f1-1ec8bd734a3b" PhonePublisherId="00000000-0000-0000-0000-000000000000"/>
 
@@ -63,6 +65,7 @@
 				</uap3:Properties>
 			</uap3:AppExtension>
 		</uap3:Extension>
+    <desktop:Extension Category="windows.fullTrustProcess" Executable="openexe.exe" />
 	</Extensions>
     </Application>
   </Applications>
@@ -92,5 +95,6 @@
   <Capabilities>
     <Capability Name="internetClient" />
     <Capability Name="privateNetworkClientServer"/>
+    <rescap:Capability Name="runFullTrust"/>
   </Capabilities>
 </Package>
