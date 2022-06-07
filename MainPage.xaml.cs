@@ -1,6 +1,9 @@
 ﻿using System;
 using System.Linq;
+using System.IO;
+using System.Net.Http;
 using Windows.Storage;
+using Windows.Storage.Streams;
 using Windows.Foundation;
 using Windows.ApplicationModel;
 using Windows.UI.Xaml.Controls;
@@ -9,6 +12,7 @@ using Microsoft.Web.WebView2.Core;
 using Windows.UI.Popups;
 using Windows.UI.Xaml.Navigation;
 using Microsoft.Gaming.XboxGameBar;
+using System.Text.RegularExpressions;
 
 namespace zhiqiong
 {
@@ -21,9 +25,10 @@ namespace zhiqiong
         public bool hasInputBox = false;
         public int origWidth = 0;
         public int origHeight = 0;
-        public bool isOversea = false;
+        public string currentMap = "CN";
         public string mapCN = "https://webstatic.mihoyo.com/app/ys-map-cn/index.html#/map/2";
         public string mapOS = "https://act.hoyolab.com/ys/app/interactive-map/index.html#/map/2";
+        public string mapJG = "https://yuanshen.site/index.html?locale=zh-CN";
         public XboxGameBarWidget gamebarWindow = null;
         public MainPage()
         {
@@ -71,13 +76,25 @@ namespace zhiqiong
                 await webView.CoreWebView2.ExecuteScriptAsync("console.log('RESIZE:" + res + "')");
             }
         }
+        public void loadMapPage()
+        {
+            var cachedMap = ApplicationData.Current.LocalSettings.Values["currentMap"];
+            if (cachedMap != null)
+            {
+                currentMap = cachedMap.ToString();
+                if (currentMap != "CN" && currentMap != "OS" && currentMap != "JG")
+                {
+                    currentMap = "CN";
+                }
+            }
+            webView.CoreWebView2.Navigate(currentMap == "CN" ? mapCN : (currentMap == "OS" ? mapOS : mapJG));
+        }
         /// <summary>
         /// Run JS in Webview2 on init
         /// </summary>
         public async void WvInit()
         {
             await webView.EnsureCoreWebView2Async();
-            webView.CoreWebView2.Navigate(isOversea ? mapOS : mapCN);
             await webView.CoreWebView2.AddScriptToExecuteOnDocumentCreatedAsync(@"
                 window.alert = (msg)=>{window.chrome.webview.postMessage({action:'ALERT',msg:msg.toString()})};
                 !function(){const s = document.createElement('script')
@@ -93,12 +110,36 @@ namespace zhiqiong
             webView.CoreWebView2.WebMessageReceived += CoreWebView2_WebMessageReceived;
             webView.CoreWebView2.WebResourceRequested += CoreWebView2_WebResourceRequested;
             webView.CoreWebView2.AddWebResourceRequestedFilter("http://localhost:32333/*", CoreWebView2WebResourceContext.All);
+            webView.CoreWebView2.AddWebResourceRequestedFilter("https://yuanshen.site/index.html*", CoreWebView2WebResourceContext.All);
+            loadMapPage();
         }
         /// <summary>
         /// Set headers
         /// </summary>
         public void CoreWebView2_WebResourceRequested(object sender, CoreWebView2WebResourceRequestedEventArgs e)
         {
+            if (e.Request.Uri.ToString().Contains("yuanshen.site/index"))
+            {
+                // send http request
+                var def = e.GetDeferral();
+                var client = new HttpClient();
+                var response = client.GetAsync(e.Request.Uri).GetAwaiter().GetResult();
+                var responseContent = response.Content.ReadAsStringAsync().GetAwaiter().GetResult();
+                // replace csp tag in content
+                responseContent = responseContent.Replace("-Policy", "");
+                // make a irandomaccessstream
+                InMemoryRandomAccessStream stream = new InMemoryRandomAccessStream();
+                // write to stream
+                DataWriter writer = new DataWriter(stream);
+                writer.WriteString(responseContent);
+                writer.StoreAsync().GetAwaiter().GetResult();
+                // set response
+                CoreWebView2WebResourceResponse newres = webView.CoreWebView2.Environment.CreateWebResourceResponse(stream, 200, "OK", "Content-Type: text/html");
+                e.Response = newres;
+                // go
+                def.Complete();
+                return;
+            }
             e.Request.Headers.SetHeader("Origin", "@zhiqiong");
         }
         /// <summary>
@@ -235,14 +276,42 @@ namespace zhiqiong
                 // no ctxmenu on non-input elements
                 args.Handled = true;
             }
-            // add
-            CoreWebView2ContextMenuItem subItem = webView.CoreWebView2.Environment.CreateContextMenuItem("切换到" + (isOversea ? "米游社" : "HoyoLab"), null, CoreWebView2ContextMenuItemKind.Command);
-            subItem.CustomItemSelected += delegate (CoreWebView2ContextMenuItem send, Object ex)
+            if (currentMap != "JG")
             {
-                isOversea = !isOversea;
-                webView.CoreWebView2.Navigate(isOversea ? mapOS : mapCN);
-            };
-            menuList.Insert(0, subItem);
+
+                CoreWebView2ContextMenuItem subItem = webView.CoreWebView2.Environment.CreateContextMenuItem("切换到空荧酒馆", null, CoreWebView2ContextMenuItemKind.Command);
+                subItem.CustomItemSelected += delegate (CoreWebView2ContextMenuItem send, Object ex)
+                {
+                    currentMap = "JG";
+                    ApplicationData.Current.LocalSettings.Values["currentMap"] = currentMap;
+                    loadMapPage();
+                };
+                menuList.Insert(0, subItem);
+            }
+            if (currentMap != "OS")
+            {
+
+                CoreWebView2ContextMenuItem subItem = webView.CoreWebView2.Environment.CreateContextMenuItem("切换到HoyoLab", null, CoreWebView2ContextMenuItemKind.Command);
+                subItem.CustomItemSelected += delegate (CoreWebView2ContextMenuItem send, Object ex)
+                {
+                    currentMap = "OS";
+                    ApplicationData.Current.LocalSettings.Values["currentMap"] = currentMap;
+                    loadMapPage();
+                };
+                menuList.Insert(0, subItem);
+            }
+            if (currentMap != "CN")
+            {
+
+                CoreWebView2ContextMenuItem subItem = webView.CoreWebView2.Environment.CreateContextMenuItem("切换到米游社", null, CoreWebView2ContextMenuItemKind.Command);
+                subItem.CustomItemSelected += delegate (CoreWebView2ContextMenuItem send, Object ex)
+                {
+                    currentMap = "CN";
+                    ApplicationData.Current.LocalSettings.Values["currentMap"] = currentMap;
+                    loadMapPage();
+                };
+                menuList.Insert(0, subItem);
+            }
 
         }
         public async void InputBox()
