@@ -21,18 +21,29 @@ namespace zhiqiong
     /// </summary>
     public sealed partial class MainPage : Page
     {
+        public string cocogoatControlAppId = "@zhiqiong";
+        public string uwpPackageId = Package.Current.Id.FamilyName;
+        public string tokenUuid = "";
         public bool isInGameBar = false;
         public bool hasInputBox = false;
         public int origWidth = 0;
         public int origHeight = 0;
         public string currentMap = "CN";
-        public string mapCN = "https://webstatic.mihoyo.com/app/ys-map-cn/index.html#/map/2";
-        public string mapOS = "https://act.hoyolab.com/ys/app/interactive-map/index.html#/map/2";
-        public string mapJG = "https://yuanshen.site/index.html?locale=zh-CN";
+
+        public Dictionary<string, string> mapUrl = new Dictionary<string, string>();
+        public Dictionary<string, string> mapName = new Dictionary<string, string>();
         public XboxGameBarWidget gamebarWindow = null;
         public MainPage()
         {
-
+            mapUrl.Add("GH", "https://static-web.ghzs.com/cspage_pro/yuanshenMap.html#/");
+            mapName.Add("GH", "光环助手");
+            mapUrl.Add("JG", "https://yuanshen.site/index.html?locale=zh-CN");
+            mapName.Add("JG", "空荧酒馆");
+            mapUrl.Add("OS", "https://act.hoyolab.com/ys/app/interactive-map/index.html#/map/2");
+            mapName.Add("OS", "HoyoLab");
+            mapUrl.Add("CN", "https://webstatic.mihoyo.com/app/ys-map-cn/index.html#/map/2");
+            mapName.Add("CN", "米游社");
+            tokenUuid = Guid.NewGuid().ToString();
             InitializeComponent();
             WvInit();
         }
@@ -82,12 +93,12 @@ namespace zhiqiong
             if (cachedMap != null)
             {
                 currentMap = cachedMap.ToString();
-                if (currentMap != "CN" && currentMap != "OS" && currentMap != "JG")
+                if (!mapUrl.ContainsKey(currentMap))
                 {
                     currentMap = "CN";
                 }
             }
-            webView.CoreWebView2.Navigate(currentMap == "CN" ? mapCN : (currentMap == "OS" ? mapOS : mapJG));
+            webView.CoreWebView2.Navigate(mapUrl[currentMap]);
         }
         /// <summary>
         /// Run JS in Webview2 on init
@@ -100,6 +111,7 @@ namespace zhiqiong
                 !function(){const s = document.createElement('script')
                 s.src = 'https://zhiqiong.vercel.app/sharedmap.user.js?t='+Math.floor(new Date().getTime()/(1000*3600*24))*(3600*24)
                 s.onerror = () => { alert('共享地图加载失败，请检查是否可以连接到 https://zhiqiong.vercel.app '); }
+                s.onload = () => { try{$map.control.token='"+tokenUuid+@"'}catch(e){} }
                 window.addEventListener('DOMContentLoaded',()=>{document.head.appendChild(s);window.addEventListener('contextmenu', (e)=>{e.stopImmediatePropagation()},true);})}()
                 document.addEventListener('focus',(e)=>{if(e.target.tagName==='INPUT'||e.target.tagName==='TEXTAREA')window.chrome.webview.postMessage({action:'INPUT'})}, true);
                 window.onload = ()=>{window.chrome.webview.postMessage({action:'LOAD'})};
@@ -140,7 +152,7 @@ namespace zhiqiong
                 def.Complete();
                 return;
             }
-            e.Request.Headers.SetHeader("Origin", "@zhiqiong");
+            e.Request.Headers.SetHeader("Origin", cocogoatControlAppId);
         }
         /// <summary>
         /// Handle message
@@ -154,7 +166,7 @@ namespace zhiqiong
             if (action == "PLUGIN")
             {
                 string pluginToken = jObject.GetNamedString("token");
-                string pluginQuery = pluginToken == "" ? "" : ("?local-auth=" + pluginToken);
+                string pluginQuery = pluginToken == "" ? "" : ("?register-token=" + pluginToken + "&register-origin=" + cocogoatControlAppId + "&register-uwp=" + uwpPackageId);
                 string pluginLaunch = "cocogoat-control://launch" + pluginQuery;
                 if (this.isInGameBar)
                 {
@@ -178,12 +190,12 @@ namespace zhiqiong
             {
                 await webView.CoreWebView2.ExecuteScriptAsync(@"
                     console.log('Zhiqiong-UWP: Load');
-                    webControlMAP.ev.on('hotkey',(e)=>{if(e==='AltZ')window.chrome.webview.postMessage({action:'MAXIMIZE'})})
+                    $map.control.ev.on('hotkey',(e)=>{if(e==='AltZ')window.chrome.webview.postMessage({action:'MAXIMIZE'})})
                     fetch('https://77.cocogoat.work/upgrade/zhiqiong-uwp.json?t='+Math.round(Date.now()/1000/3600)).then(e=>e.json()).then(e=>{
                         const targetVer = e.version;
                         const curVer = (navigator.userAgent.match(/zhiqiong-uwp\/([0-9.]*)/)||[])[1]||'0.0.0.0'
                         if($map.control.versionCompare(targetVer,curVer)>0){
-                            window.chrome.webview.postMessage({action:'COPYALERT',url:'https://zhiqiong.cocogoat.work',msg:'发现新版本 v'+targetVer+'（当前版本 v'+curVer+'），请按Win+G打开Xbox Game Bar后复制下方地址手动下载更新'})
+                            window.chrome.webview.postMessage({action:'ONUPDATE',url:'https://cocogoat.work/zhiqiong',title:'发现新版本 v'+targetVer,msg:'当前版本为 v'+curVer+'，是否更新？'})
                         }
                     })
                 ");
@@ -193,22 +205,30 @@ namespace zhiqiong
                 string msg = jObject.GetNamedString("msg");
                 await new MessageDialog(msg).ShowAsync();
             }
-            if (action == "COPYALERT")
+            if (action == "ONUPDATE")
             {
-                ContentDialog dialog = new ContentDialog();
-                TextBox inputTextBox = new TextBox();
-                dialog.Content = inputTextBox;
-                inputTextBox.Text = jObject.GetNamedString("url");
-                dialog.Title = jObject.GetNamedString("msg");
-                dialog.PrimaryButtonText = "复制并关闭";
-                dialog.SecondaryButtonText = "取消";
-                if (await dialog.ShowAsync() == ContentDialogResult.Primary)
+                try
                 {
-                    // copy to clipboard
-                    Windows.ApplicationModel.DataTransfer.DataPackage dataPackage = new Windows.ApplicationModel.DataTransfer.DataPackage();
-                    dataPackage.SetText(inputTextBox.Text);
-                    Windows.ApplicationModel.DataTransfer.Clipboard.SetContent(dataPackage);
+                    ContentDialog dialog = new ContentDialog();
+                    dialog.Title = jObject.GetNamedString("title");
+                    dialog.Content = new TextBlock() { Text = jObject.GetNamedString("msg") };
+                    dialog.PrimaryButtonText = "去更新";
+                    dialog.SecondaryButtonText = "取消";
+                    if (await dialog.ShowAsync() == ContentDialogResult.Primary)
+                    {
+
+                        if (this.isInGameBar)
+                        {
+                            await OpenInFullTrust(jObject.GetNamedString("url"));
+                        }
+                        else
+                        {
+                            var uri = new Uri(jObject.GetNamedString("url"));
+                            await Windows.System.Launcher.LaunchUriAsync(uri);
+                        }
+                    }
                 }
+                catch { }
             }
         }
         /// <summary>
@@ -227,6 +247,7 @@ namespace zhiqiong
             }
             settings.UserAgent = settings.UserAgent + " zhiqiong-uwp/" + strver;
             settings.UserAgent = settings.UserAgent + " zhiqiong-dim/" + (isInGameBar ? "gamebar" : "webview");
+            settings.UserAgent = settings.UserAgent + " zhiqiong-pkg/" + uwpPackageId;
         }
         /// <summary>
         /// Open default browser instead
@@ -276,43 +297,18 @@ namespace zhiqiong
                 // no ctxmenu on non-input elements
                 args.Handled = true;
             }
-            if (currentMap != "JG")
+            foreach (KeyValuePair<string, string> item in mapName)
             {
-
-                CoreWebView2ContextMenuItem subItem = webView.CoreWebView2.Environment.CreateContextMenuItem("切换到空荧酒馆", null, CoreWebView2ContextMenuItemKind.Command);
+                if (currentMap == item.Key) continue;
+                CoreWebView2ContextMenuItem subItem = webView.CoreWebView2.Environment.CreateContextMenuItem("切换到" + item.Value, null, CoreWebView2ContextMenuItemKind.Command);
                 subItem.CustomItemSelected += delegate (CoreWebView2ContextMenuItem send, Object ex)
-                {
-                    currentMap = "JG";
-                    ApplicationData.Current.LocalSettings.Values["currentMap"] = currentMap;
-                    loadMapPage();
-                };
+                    {
+                        currentMap = item.Key;
+                        ApplicationData.Current.LocalSettings.Values["currentMap"] = currentMap;
+                        loadMapPage();
+                    };
                 menuList.Insert(0, subItem);
             }
-            if (currentMap != "OS")
-            {
-
-                CoreWebView2ContextMenuItem subItem = webView.CoreWebView2.Environment.CreateContextMenuItem("切换到HoyoLab", null, CoreWebView2ContextMenuItemKind.Command);
-                subItem.CustomItemSelected += delegate (CoreWebView2ContextMenuItem send, Object ex)
-                {
-                    currentMap = "OS";
-                    ApplicationData.Current.LocalSettings.Values["currentMap"] = currentMap;
-                    loadMapPage();
-                };
-                menuList.Insert(0, subItem);
-            }
-            if (currentMap != "CN")
-            {
-
-                CoreWebView2ContextMenuItem subItem = webView.CoreWebView2.Environment.CreateContextMenuItem("切换到米游社", null, CoreWebView2ContextMenuItemKind.Command);
-                subItem.CustomItemSelected += delegate (CoreWebView2ContextMenuItem send, Object ex)
-                {
-                    currentMap = "CN";
-                    ApplicationData.Current.LocalSettings.Values["currentMap"] = currentMap;
-                    loadMapPage();
-                };
-                menuList.Insert(0, subItem);
-            }
-
         }
         public async void InputBox()
         {
