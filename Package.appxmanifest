@@ -12,7 +12,7 @@
   <Identity
     Name="zhiqiong"
     Publisher="CN=晓羽"
-    Version="1.0.8.0" />
+    Version="1.1.0.0" />
 
   <mp:PhoneIdentity PhoneProductId="57308517-2e88-4db2-97f1-1ec8bd734a3b" PhonePublisherId="00000000-0000-0000-0000-000000000000"/>
 
@@ -38,15 +38,26 @@
         DisplayName="志琼·原神地图"
         Square150x150Logo="Assets\Square150x150Logo.png"
         Square44x44Logo="Assets\Square44x44Logo.png"
-        Description="椰羊·米游社悬浮地图"
+        Description="让你的原神地图能定位，可共享"
         BackgroundColor="transparent">
-        <uap:DefaultTile Wide310x150Logo="Assets\Wide310x150Logo.png" ShortName="米游社地图" Square71x71Logo="Assets\SmallTile.png" Square310x310Logo="Assets\LargeTile.png"/>
+        <uap:DefaultTile Wide310x150Logo="Assets\Wide310x150Logo.png" ShortName="志琼" Square71x71Logo="Assets\SmallTile.png" Square310x310Logo="Assets\LargeTile.png">
+          <uap:ShowNameOnTiles>
+            <uap:ShowOn Tile="square150x150Logo"/>
+            <uap:ShowOn Tile="wide310x150Logo"/>
+            <uap:ShowOn Tile="square310x310Logo"/>
+          </uap:ShowNameOnTiles>
+        </uap:DefaultTile >
         <uap:SplashScreen Image="Assets\SplashScreen.png" />
         <uap:LockScreen BadgeLogo="Assets\BadgeLogo.png" Notification="badgeAndTileText"/>
+        <uap:InitialRotationPreference>
+          <uap:Rotation Preference="portraitFlipped"/>
+          <uap:Rotation Preference="landscapeFlipped"/>
+          <uap:Rotation Preference="portrait"/>
+          <uap:Rotation Preference="landscape"/></uap:InitialRotationPreference>
       </uap:VisualElements>
 	<Extensions>
 		<uap3:Extension Category="windows.appExtension">
-			<uap3:AppExtension Name="microsoft.gameBarUIExtension" Id="zhiqiong" DisplayName="志琼·原神地图" Description="椰羊·米游社悬浮地图" PublicFolder="GameBar">
+			<uap3:AppExtension Name="microsoft.gameBarUIExtension" Id="zhiqiong" DisplayName="志琼·原神地图" Description="让你的原神地图能定位，可共享" PublicFolder="GameBar">
 				<uap3:Properties>
 					<GameBarWidget Type ="Standard">
 						<HomeMenuVisible>true</HomeMenuVisible>

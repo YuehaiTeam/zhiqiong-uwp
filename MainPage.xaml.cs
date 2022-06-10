@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Linq;
 using System.IO;
+using System.Threading.Tasks;
 using System.Net.Http;
 using Windows.Storage;
 using Windows.Storage.Streams;
@@ -29,6 +30,7 @@ namespace zhiqiong
         public int origWidth = 0;
         public int origHeight = 0;
         public string currentMap = "CN";
+        public string version = "0.0.0";
 
         public Dictionary<string, string> mapUrl = new Dictionary<string, string>();
         public Dictionary<string, string> mapName = new Dictionary<string, string>();
@@ -44,6 +46,8 @@ namespace zhiqiong
             mapUrl.Add("CN", "https://webstatic.mihoyo.com/app/ys-map-cn/index.html#/map/2");
             mapName.Add("CN", "米游社");
             tokenUuid = Guid.NewGuid().ToString();
+            var versionRaw = Windows.ApplicationModel.Package.Current.Id.Version;
+            version = string.Format("{0}.{1}.{2}", versionRaw.Major, versionRaw.Minor, versionRaw.Build, versionRaw.Revision);
             InitializeComponent();
             WvInit();
         }
@@ -60,6 +64,17 @@ namespace zhiqiong
         {
             ApplicationData.Current.LocalSettings.Values["parameters"] = url;
             return FullTrustProcessLauncher.LaunchFullTrustProcessForCurrentAppAsync();
+        }
+        public async Task OpenUrl(string url)
+        {
+            if (isInGameBar)
+            {
+                await OpenInFullTrust(url);
+            }
+            else
+            {
+                await Windows.System.Launcher.LaunchUriAsync(new Uri(url));
+            }
         }
         /// <summary>
         /// Toggle maximize mode
@@ -111,7 +126,7 @@ namespace zhiqiong
                 !function(){const s = document.createElement('script')
                 s.src = 'https://zhiqiong.vercel.app/sharedmap.user.js?t='+Math.floor(new Date().getTime()/(1000*3600*24))*(3600*24)
                 s.onerror = () => { alert('共享地图加载失败，请检查是否可以连接到 https://zhiqiong.vercel.app '); }
-                s.onload = () => { try{$map.control.token='"+tokenUuid+@"'}catch(e){} }
+                s.onload = () => { try{$map.control.token='" + tokenUuid + @"'}catch(e){} }
                 window.addEventListener('DOMContentLoaded',()=>{document.head.appendChild(s);window.addEventListener('contextmenu', (e)=>{e.stopImmediatePropagation()},true);})}()
                 document.addEventListener('focus',(e)=>{if(e.target.tagName==='INPUT'||e.target.tagName==='TEXTAREA')window.chrome.webview.postMessage({action:'INPUT'})}, true);
                 window.onload = ()=>{window.chrome.webview.postMessage({action:'LOAD'})};
@@ -125,6 +140,14 @@ namespace zhiqiong
             webView.CoreWebView2.AddWebResourceRequestedFilter("https://yuanshen.site/index.html*", CoreWebView2WebResourceContext.All);
             loadMapPage();
         }
+        InMemoryRandomAccessStream createStream(string str)
+        {
+            InMemoryRandomAccessStream stream = new InMemoryRandomAccessStream();
+            DataWriter writer = new DataWriter(stream);
+            writer.WriteString(str);
+            writer.StoreAsync().GetAwaiter().GetResult();
+            return stream;
+        }
         /// <summary>
         /// Set headers
         /// </summary>
@@ -132,23 +155,13 @@ namespace zhiqiong
         {
             if (e.Request.Uri.ToString().Contains("yuanshen.site/index"))
             {
-                // send http request
                 var def = e.GetDeferral();
                 var client = new HttpClient();
                 var response = client.GetAsync(e.Request.Uri).GetAwaiter().GetResult();
                 var responseContent = response.Content.ReadAsStringAsync().GetAwaiter().GetResult();
-                // replace csp tag in content
                 responseContent = responseContent.Replace("-Policy", "");
-                // make a irandomaccessstream
-                InMemoryRandomAccessStream stream = new InMemoryRandomAccessStream();
-                // write to stream
-                DataWriter writer = new DataWriter(stream);
-                writer.WriteString(responseContent);
-                writer.StoreAsync().GetAwaiter().GetResult();
-                // set response
-                CoreWebView2WebResourceResponse newres = webView.CoreWebView2.Environment.CreateWebResourceResponse(stream, 200, "OK", "Content-Type: text/html");
+                CoreWebView2WebResourceResponse newres = webView.CoreWebView2.Environment.CreateWebResourceResponse(createStream(responseContent), 200, "OK", "Content-Type: text/html");
                 e.Response = newres;
-                // go
                 def.Complete();
                 return;
             }
@@ -168,15 +181,7 @@ namespace zhiqiong
                 string pluginToken = jObject.GetNamedString("token");
                 string pluginQuery = pluginToken == "" ? "" : ("?register-token=" + pluginToken + "&register-origin=" + cocogoatControlAppId + "&register-uwp=" + uwpPackageId);
                 string pluginLaunch = "cocogoat-control://launch" + pluginQuery;
-                if (this.isInGameBar)
-                {
-                    await OpenInFullTrust(pluginLaunch);
-                }
-                else
-                {
-                    var uri = new Uri(pluginLaunch);
-                    await Windows.System.Launcher.LaunchUriAsync(uri);
-                }
+                await OpenUrl(pluginLaunch);
             }
             if (action == "INPUT" && isInGameBar && !hasInputBox)
             {
@@ -216,16 +221,7 @@ namespace zhiqiong
                     dialog.SecondaryButtonText = "取消";
                     if (await dialog.ShowAsync() == ContentDialogResult.Primary)
                     {
-
-                        if (this.isInGameBar)
-                        {
-                            await OpenInFullTrust(jObject.GetNamedString("url"));
-                        }
-                        else
-                        {
-                            var uri = new Uri(jObject.GetNamedString("url"));
-                            await Windows.System.Launcher.LaunchUriAsync(uri);
-                        }
+                        await OpenUrl(jObject.GetNamedString("url"));
                     }
                 }
                 catch { }
@@ -236,16 +232,13 @@ namespace zhiqiong
         /// </summary>
         public void CoreWebView2_NavigationStarting(object sender, CoreWebView2NavigationStartingEventArgs e)
         {
-            // get version
-            var version = Windows.ApplicationModel.Package.Current.Id.Version;
-            var settings = webView.CoreWebView2.Settings;
-            string strver = string.Format("{0}.{1}.{2}", version.Major, version.Minor, version.Build, version.Revision);
             // don't change if modified
+            var settings = webView.CoreWebView2.Settings;
             if (settings.UserAgent.Contains("zhiqiong-uwp/"))
             {
                 return;
             }
-            settings.UserAgent = settings.UserAgent + " zhiqiong-uwp/" + strver;
+            settings.UserAgent = settings.UserAgent + " zhiqiong-uwp/" + version;
             settings.UserAgent = settings.UserAgent + " zhiqiong-dim/" + (isInGameBar ? "gamebar" : "webview");
             settings.UserAgent = settings.UserAgent + " zhiqiong-pkg/" + uwpPackageId;
         }
@@ -256,15 +249,7 @@ namespace zhiqiong
         {
             // preventdefault
             e.Handled = true;
-            if (this.isInGameBar)
-            {
-                await OpenInFullTrust(e.Uri);
-            }
-            else
-            {
-                var uri = new Uri(e.Uri);
-                await Windows.System.Launcher.LaunchUriAsync(uri);
-            }
+            await OpenUrl(e.Uri);
         }
         /// <summary>
         /// Change contextmenu
@@ -297,10 +282,18 @@ namespace zhiqiong
                 // no ctxmenu on non-input elements
                 args.Handled = true;
             }
+            CoreWebView2ContextMenuItem aboutItem = webView.CoreWebView2.Environment.CreateContextMenuItem("志琼 v" + version, null, CoreWebView2ContextMenuItemKind.Command);
+            aboutItem.CustomItemSelected += async delegate (CoreWebView2ContextMenuItem send, Object ex)
+            {
+                await OpenUrl("https://cocogoat.work/zhiqiong");
+            };
+            menuList.Insert(2, webView.CoreWebView2.Environment.CreateContextMenuItem("", null, CoreWebView2ContextMenuItemKind.Separator));
+            menuList.Insert(3, aboutItem);
+            menuList.Insert(0, webView.CoreWebView2.Environment.CreateContextMenuItem("", null, CoreWebView2ContextMenuItemKind.Separator));
             foreach (KeyValuePair<string, string> item in mapName)
             {
-                if (currentMap == item.Key) continue;
-                CoreWebView2ContextMenuItem subItem = webView.CoreWebView2.Environment.CreateContextMenuItem("切换到" + item.Value, null, CoreWebView2ContextMenuItemKind.Command);
+                CoreWebView2ContextMenuItem subItem = webView.CoreWebView2.Environment.CreateContextMenuItem(item.Value, null, CoreWebView2ContextMenuItemKind.CheckBox);
+                subItem.IsChecked = currentMap == item.Key;
                 subItem.CustomItemSelected += delegate (CoreWebView2ContextMenuItem send, Object ex)
                     {
                         currentMap = item.Key;
@@ -309,6 +302,9 @@ namespace zhiqiong
                     };
                 menuList.Insert(0, subItem);
             }
+            CoreWebView2ContextMenuItem sepItem2 = webView.CoreWebView2.Environment.CreateContextMenuItem("地图切换", null, CoreWebView2ContextMenuItemKind.Command);
+            sepItem2.IsEnabled = false;
+            menuList.Insert(0, sepItem2);
         }
         public async void InputBox()
         {
