@@ -13,6 +13,9 @@ using Windows.UI.Xaml.Controls.Primitives;
 using Windows.UI.Xaml.Data;
 using Windows.UI.Xaml.Input;
 using Windows.UI.Xaml.Media;
+using Windows.UI.Popups;
+using Windows.UI.ViewManagement;
+using Windows.UI.Core.Preview;
 using Windows.UI.Xaml.Navigation;
 using Microsoft.Gaming.XboxGameBar;
 
@@ -24,6 +27,7 @@ namespace zhiqiong
     sealed partial class App : Application
     {
         private XboxGameBarWidget gamebarWindow = null;
+        private XboxGameBarWidgetControl gameBarControl = null;
         /// <summary>
         /// 初始化单一实例应用程序对象。这是执行的创作代码的第一行，
         /// 已执行，逻辑上等同于 main() 或 WinMain()。
@@ -83,6 +87,7 @@ namespace zhiqiong
                         widgetArgs,
                         Window.Current.CoreWindow,
                         rootFrame);
+                    gameBarControl = new XboxGameBarWidgetControl(gamebarWindow);
                     rootFrame.Navigate(typeof(MainPage), gamebarWindow);
 
                     Window.Current.Closed += gamebarWindowWindow_Closed;
@@ -138,6 +143,8 @@ namespace zhiqiong
                     rootFrame.Navigate(typeof(MainPage), e.Arguments);
                 }
                 // 确保当前窗口处于活动状态
+
+                SystemNavigationManagerPreview.GetForCurrentView().CloseRequested += App_CloseRequested;
                 Window.Current.Activate();
             }
         }
@@ -165,6 +172,30 @@ namespace zhiqiong
             gamebarWindow = null;
             //TODO: 保存应用程序状态并停止任何后台活动
             deferral.Complete();
+        }
+        private async void App_CloseRequested(object sender, SystemNavigationCloseRequestedPreviewEventArgs e)
+        {
+            var deferral = e.GetDeferral();
+            if (gameBarControl != null)
+            {
+                ContentDialog dialog = new ContentDialog();
+                dialog.Title = "提示";
+                dialog.Content = new TextBlock() { Text = "关闭本窗口将同时关闭正在运行的Xbox Game Bar小组件，确定要退出吗？" };
+                dialog.PrimaryButtonText = "退出";
+                dialog.SecondaryButtonText = "取消";
+                if (await dialog.ShowAsync() != ContentDialogResult.Primary)
+                {
+                    e.Handled = true;
+                }
+                else
+                {
+                    await gameBarControl.CloseAsync("zhiqiong");
+                }
+            }
+            else
+            {
+                deferral.Complete();
+            }
         }
     }
 }
