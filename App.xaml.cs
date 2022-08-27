@@ -190,6 +190,7 @@ namespace zhiqiong
                 else
                 {
                     await gameBarControl.CloseAsync("zhiqiong");
+                    deferral.Complete();
                 }
             }
             else
