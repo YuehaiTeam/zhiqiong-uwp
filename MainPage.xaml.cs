@@ -124,8 +124,8 @@ namespace zhiqiong
             await webView.CoreWebView2.AddScriptToExecuteOnDocumentCreatedAsync(@"
                 window.alert = (msg)=>{window.chrome.webview.postMessage({action:'ALERT',msg:msg.toString()})};
                 !function(){const s = document.createElement('script')
-                s.src = 'https://zhiqiong.vercel.app/sharedmap.user.js?t='+Math.floor(new Date().getTime()/(1000*3600*24))*(3600*24)
-                s.onerror = () => { alert('共享地图加载失败，请检查是否可以连接到 https://zhiqiong.vercel.app '); }
+                s.src = 'https://77.xyget.cn/zhiqiong/sharedmap.user.js'
+                s.onerror = () => { alert('共享地图加载失败，请检查网络连接是否正常'); }
                 s.onload = () => { try{$map.control.token='" + tokenUuid + @"'}catch(e){} }
                 window.addEventListener('DOMContentLoaded',()=>{document.head.appendChild(s);window.addEventListener('contextmenu', (e)=>{e.stopImmediatePropagation()},true);})}()
                 document.addEventListener('focus',(e)=>{if(e.target.tagName==='INPUT'||e.target.tagName==='TEXTAREA')window.chrome.webview.postMessage({action:'INPUT'})}, true);

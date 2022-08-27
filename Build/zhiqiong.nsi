@@ -1,4 +1,4 @@
-﻿!define UWPVER 1.1.0
+﻿!define UWPVER 1.1.1
 Name "志琼·原神地图"
 OutFile "..\Dist\zhiqiong-${UWPVER}.exe"
 Unicode True
